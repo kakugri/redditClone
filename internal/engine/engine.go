@@ -11,6 +11,7 @@ import (
 type RedditEngine struct {
 	users      map[string]*User
 	subreddits map[string]*Subreddit
+	posts      map[string]*Post
 	messages   map[string][]*DirectMessage
 	mu         sync.RWMutex
 }
@@ -29,8 +30,8 @@ func (e *RedditEngine) Receive(context actor.Context) {
 		e.handleRegisterUser(context, msg)
 	case *CreateSubredditMsg:
 		e.handleCreateSubreddit(context, msg)
-		// case *CreatePostMsg:
-		// 	e.handleCreatePost(context, msg)
+	case *CreatePostMsg:
+		e.handleCreatePost(context, msg)
 		// case *VoteMsg:
 		// 	e.handleVote(context, msg)
 		// case *CreateCommentMsg:
@@ -51,6 +52,22 @@ func (e *RedditEngine) handleRegisterUser(context actor.Context, msg *RegisterUs
 	}
 	e.users[user.ID] = user
 	context.Respond(user)
+}
+
+func (e *RedditEngine) handleCreatePost(context actor.Context, msg *CreatePostMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	post := &Post{
+		ID:          generateID(),
+		Title:       msg.Title,
+		Content:     msg.Content,
+		AuthorID:    msg.AuthorID,
+		SubredditID: msg.SubredditID,
+		CreatedAt:   time.Now(),
+	}
+	e.posts[post.ID] = post
+	context.Respond(post)
 }
 
 func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *CreateSubredditMsg) {
