@@ -7,6 +7,7 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
+	"github.com/kakugri/redditClone/internal/engine"
 	"github.com/kakugri/redditClone/internal/simulator"
 )
 
@@ -20,7 +21,8 @@ func main() {
 	remoting.Start()
 
 	// Target the RedditEngine actor
-	enginePID := actor.NewPID("localhost:8080", "reddit-engine")
+	// enginePID := actor.NewPID("localhost:8080", "reddit-engine")
+	enginePID := actor.NewPID("127.0.0.1:8080", "reddit-engine")
 	log.Printf("Simulator targeting engine at Address=%s, Id=%s", enginePID.GetAddress(), enginePID.GetId())
 
 	// Subscribe to DeadLetter events for debugging
@@ -33,7 +35,17 @@ func main() {
 
 	// Delay startup to ensure the engine is initialized
 	log.Println("Waiting for engine to initialize...")
-	time.Sleep(10 * time.Second) // Adjust this delay based on engine startup time
+	time.Sleep(10 * time.Second)
+
+	// Send a test CreatePostMsg to the engine
+	log.Println("Sending test CreatePostMsg to engine...")
+	system.Root.Send(enginePID, &engine.CreatePostMsg{
+		Title:       "Test Post",
+		Content:     "Test Content",
+		AuthorID:    "test-author-id",
+		SubredditID: "test-subreddit-id",
+	})
+	log.Println("Test CreatePostMsg sent.")
 
 	// Start the simulator with 5 simulated users
 	sim := simulator.NewSimulator(enginePID, 5)

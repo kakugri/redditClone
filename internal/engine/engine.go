@@ -27,8 +27,12 @@ func NewRedditEngine() *RedditEngine {
 }
 
 func (e *RedditEngine) Receive(context actor.Context) {
-	log.Printf("Engine received message: %+v", context.Message()) // Log all messages
-	switch msg := context.Message().(type) {
+	message := context.Message()
+
+	// Log the type and content of the message
+	log.Printf("Engine received message of type: %T, content: %+v", message, message)
+
+	switch msg := message.(type) {
 	case *actor.Started:
 		log.Println("RedditEngine started and ready to receive messages.")
 	case *RegisterUserMsg:
