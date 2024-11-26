@@ -141,6 +141,58 @@ func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
 	log.Printf("Target not found for VoteMsg: %+v", msg)
 }
 
+func (e *RedditEngine) handleComment(context actor.Context, msg *proto.CreateCommentMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Check if the post exists
+	post, postExists := e.posts[msg.PostId]
+	if !postExists {
+		log.Printf("Post not found for CreateCommentMsg: %+v", msg)
+		return
+	}
+
+	// Create a new comment
+	comment := &Comment{
+		ID:        generateID(),
+		Content:   msg.Content,
+		AuthorID:  msg.AuthorId,
+		PostID:    msg.PostId,
+		ParentID:  msg.ParentId,
+		Children:  []*Comment{},
+		CreatedAt: time.Now(),
+	}
+
+	// Add to the comments map
+	if _, exists := e.comments[comment.PostID]; !exists {
+		e.comments[comment.PostID] = []*Comment{}
+	}
+	e.comments[comment.PostID] = append(e.comments[comment.PostID], comment)
+
+	// If the comment has a parent, link it to the parent
+	if comment.ParentID != "" {
+		parentFound := false
+		// Get all the comments for the post
+		for _, c := range e.comments[comment.PostID] {
+			// Check if the parent comment exists
+			if c.ID == comment.ParentID {
+				c.Children = append(c.Children, comment)
+				parentFound = true
+				break
+			}
+		}
+		if !parentFound {
+			log.Printf("Parent comment not found for CommentID=%s, ParentID=%s", comment.ID, comment.ParentID)
+			return
+		}
+	} else {
+		// Root-level comment
+		post.Comments = append(post.Comments, comment)
+	}
+
+	log.Printf("Comment added: %+v", comment)
+}
+
 func applyVoteToPost(post *Post, isUpvote bool) {
 	if isUpvote {
 		post.Upvotes++
