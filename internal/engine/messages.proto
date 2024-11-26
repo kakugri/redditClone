@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package engine;
+
+// Specify the Go package for the generated code
+option go_package = "github.com/kakugri/redditClone/internal/engine;engine";
+
+// Message for creating a post
+message CreatePostMsg {
+  string title = 1;
+  string content = 2;
+  string author_id = 3;
+  string subreddit_id = 4;
+}

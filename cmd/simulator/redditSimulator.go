@@ -7,7 +7,7 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
-	"github.com/kakugri/redditClone/internal/engine"
+	"github.com/kakugri/redditClone/internal/proto"
 	"github.com/kakugri/redditClone/internal/simulator"
 )
 
@@ -21,7 +21,6 @@ func main() {
 	remoting.Start()
 
 	// Target the RedditEngine actor
-	// enginePID := actor.NewPID("localhost:8080", "reddit-engine")
 	enginePID := actor.NewPID("127.0.0.1:8080", "reddit-engine")
 	log.Printf("Simulator targeting engine at Address=%s, Id=%s", enginePID.GetAddress(), enginePID.GetId())
 
@@ -39,27 +38,28 @@ func main() {
 
 	// Send a test CreatePostMsg to the engine
 	log.Println("Sending test CreatePostMsg to engine...")
-	system.Root.Send(enginePID, &engine.CreatePostMsg{
+	system.Root.Send(enginePID, &proto.CreatePostMsg{
 		Title:       "Test Post",
 		Content:     "Test Content",
-		AuthorID:    "test-author-id",
-		SubredditID: "test-subreddit-id",
+		AuthorId:    "test-author-id",
+		SubredditId: "test-subreddit-id",
 	})
 	log.Println("Test CreatePostMsg sent.")
+	time.Sleep(20 * time.Second)
 
 	// Start the simulator with 5 simulated users
-	sim := simulator.NewSimulator(enginePID, 5)
+	sim := simulator.NewSimulator(enginePID, 3)
 	sim.Start()
-	log.Println("Simulator started and running.")
+	log.Println("Simulator started.")
 
-	// // Print metrics every minute
-	// go func() {
-	// 	ticker := time.NewTicker(1 * time.Minute)
-	// 	for range ticker.C {
-	// 		metrics := sim.GetMetrics()
-	// 		log.Printf("Metrics: %+v", metrics)
-	// 	}
-	// }()
+	// Print metrics every minute
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		for range ticker.C {
+			metrics := sim.GetMetrics()
+			log.Printf("Metrics: %+v", metrics)
+		}
+	}()
 
 	// Keep the simulator process alive
 	select {}

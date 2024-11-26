@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package proto;
+
+// Specify the Go package for the generated code
+option go_package = "github.com/kakugri/redditClone/internal/proto;proto";
+
+// protoc --go_out=. --go_opt=paths=source_relative messages.proto
+
+// Message for creating a post
+message CreatePostMsg {
+  string title = 1;
+  string content = 2;
+  string author_id = 3;
+  string subreddit_id = 4;
+}
+
+message RegisterUserMsg {
+	string Username = 1;
+}
+
+message CreateSubredditMsg {
+	string name = 1;
+	string description = 2;
+	string creator_id = 3;
+}
+
+message JoinSubredditMsg {
+	string user_id = 1;
+	string subreddit_id = 2;
+}
+
+message CreateCommentMsg {
+	string content = 1;
+	string author_id = 2;
+	string post_id = 3;
+	string parent_id = 4;
+}
+
+message VoteMsg {
+	string user_id = 1;
+	string target_id = 2;
+	bool isUpvote = 3;
+}
+
+message GetFeedMsg {
+	string user_id = 1;
+}
+
+message DirectMessageMsg {
+	string fromUser_id = 1;
+	string toUser_id = 2;
+	string content = 3;
+}

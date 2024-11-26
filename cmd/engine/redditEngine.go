@@ -23,7 +23,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start engine: %v", err)
 	}
-	log.Printf("Reddit Engine running at PID: %v", pid)
 	log.Printf("RedditEngine started: Address=%s, Id=%s", pid.GetAddress(), pid.GetId())
 
 

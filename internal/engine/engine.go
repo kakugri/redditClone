@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kakugri/redditClone/internal/proto"
+
 	"github.com/asynkron/protoactor-go/actor"
 )
 
@@ -14,6 +16,7 @@ type RedditEngine struct {
 	subreddits map[string]*Subreddit
 	posts      map[string]*Post
 	messages   map[string][]*DirectMessage
+	comments   map[string][]*Comment
 	mu         sync.RWMutex
 }
 
@@ -23,6 +26,7 @@ func NewRedditEngine() *RedditEngine {
 		subreddits: make(map[string]*Subreddit),
 		posts:      make(map[string]*Post),
 		messages:   make(map[string][]*DirectMessage),
+		comments:   make(map[string][]*Comment),
 	}
 }
 
@@ -35,13 +39,13 @@ func (e *RedditEngine) Receive(context actor.Context) {
 	switch msg := message.(type) {
 	case *actor.Started:
 		log.Println("RedditEngine started and ready to receive messages.")
-	case *RegisterUserMsg:
+	case *proto.RegisterUserMsg:
 		log.Printf("Received RegisterUserMsg: %+v", msg)
 		e.handleRegisterUser(context, msg)
-	case *CreateSubredditMsg:
+	case *proto.CreateSubredditMsg:
 		log.Printf("Received CreateSubredditMsg: %+v", msg)
 		e.handleCreateSubreddit(context, msg)
-	case *CreatePostMsg:
+	case *proto.CreatePostMsg:
 		log.Printf("Received CreatePostMsg: %+v", msg)
 		e.handleCreatePost(context, msg)
 	default:
@@ -55,7 +59,7 @@ func (e *RedditEngine) Receive(context actor.Context) {
 	}
 }
 
-func (e *RedditEngine) handleRegisterUser(context actor.Context, msg *RegisterUserMsg) {
+func (e *RedditEngine) handleRegisterUser(context actor.Context, msg *proto.RegisterUserMsg) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -66,14 +70,14 @@ func (e *RedditEngine) handleRegisterUser(context actor.Context, msg *RegisterUs
 	}
 	e.users[user.ID] = user
 	log.Printf("User registered: %+v", user)
-	context.Respond(user)
+	// context.Respond(user)
 }
 
-func (e *RedditEngine) handleCreatePost(context actor.Context, msg *CreatePostMsg) {
+func (e *RedditEngine) handleCreatePost(context actor.Context, msg *proto.CreatePostMsg) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if msg.AuthorID == "" || msg.SubredditID == "" {
+	if msg.AuthorId == "" || msg.SubredditId == "" {
 		log.Printf("CreatePostMsg missing AuthorID or SubredditID: %+v", msg)
 		return
 	}
@@ -82,16 +86,16 @@ func (e *RedditEngine) handleCreatePost(context actor.Context, msg *CreatePostMs
 		ID:          generateID(),
 		Title:       msg.Title,
 		Content:     msg.Content,
-		AuthorID:    msg.AuthorID,
-		SubredditID: msg.SubredditID,
+		AuthorID:    msg.AuthorId,
+		SubredditID: msg.SubredditId,
 		CreatedAt:   time.Now(),
 	}
 	e.posts[post.ID] = post
 	log.Printf("Post created: %+v", post)
-	context.Respond(post)
+	// context.Respond(post)
 }
 
-func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *CreateSubredditMsg) {
+func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *proto.CreateSubredditMsg) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -104,7 +108,7 @@ func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *CreateS
 	}
 	e.subreddits[subreddit.ID] = subreddit
 	log.Printf("Subreddit created: %+v", subreddit)
-	context.Respond(subreddit)
+	// context.Respond(subreddit)
 }
 
 // Add other handler methods...
