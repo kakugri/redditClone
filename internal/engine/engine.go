@@ -51,10 +51,11 @@ func (e *RedditEngine) Receive(context actor.Context) {
 	case *proto.VoteMsg:
 		log.Printf("Received VoteMsg: %+v", msg)
 		e.handleVote(context, msg)
+	case *proto.CreateCommentMsg:
+		e.handleCreateComment(context, msg)
+		log.Printf("Received HandleComment: %+v", msg)
 	default:
 		log.Printf("Unhandled message type: %+v", msg)
-		// case *CreateCommentMsg:
-		// 	e.handleCreateComment(context, msg)
 		// case *DirectMessageMsg:
 		// 	e.handleDirectMessage(context, msg)
 	}
@@ -120,7 +121,11 @@ func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
 
 	// Check if the vote target is a post
 	if post, exists := e.posts[msg.TargetId]; exists {
-		applyVoteToPost(post, msg.IsUpvote)
+		if msg.IsUpvote {
+			post.Upvotes++
+		} else {
+			post.Downvotes++
+		}
 		log.Printf("Vote applied to post: PostID=%s, Upvotes=%d, Downvotes=%d, UserID=%s",
 			post.ID, post.Upvotes, post.Downvotes, msg.UserId)
 		return
@@ -130,7 +135,11 @@ func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
 	for _, comments := range e.comments {
 		for _, comment := range comments {
 			if comment.ID == msg.TargetId {
-				applyVoteToComment(comment, msg.IsUpvote)
+				if msg.IsUpvote {
+					comment.Upvotes++
+				} else {
+					comment.Downvotes++
+				}
 				log.Printf("Vote applied to comment: CommentID=%s, Upvotes=%d, Downvotes=%d, UserID=%s",
 					comment.ID, comment.Upvotes, comment.Downvotes, msg.UserId)
 				return
@@ -141,7 +150,7 @@ func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
 	log.Printf("Target not found for VoteMsg: %+v", msg)
 }
 
-func (e *RedditEngine) handleComment(context actor.Context, msg *proto.CreateCommentMsg) {
+func (e *RedditEngine) handleCreateComment(context actor.Context, msg *proto.CreateCommentMsg) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -191,22 +200,6 @@ func (e *RedditEngine) handleComment(context actor.Context, msg *proto.CreateCom
 	}
 
 	log.Printf("Comment added: %+v", comment)
-}
-
-func applyVoteToPost(post *Post, isUpvote bool) {
-	if isUpvote {
-		post.Upvotes++
-	} else {
-		post.Downvotes++
-	}
-}
-
-func applyVoteToComment(comment *Comment, isUpvote bool) {
-	if isUpvote {
-		comment.Upvotes++
-	} else {
-		comment.Downvotes++
-	}
 }
 
 func generateID() string {
