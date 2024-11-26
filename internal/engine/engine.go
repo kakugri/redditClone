@@ -149,46 +149,6 @@ func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *proto.C
 	log.Printf("Subreddit created: %+v", subreddit)
 }
 
-func (e *RedditEngine) handleCreateComment(context actor.Context, msg *proto.CreateCommentMsg) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	comment := &Comment{
-		ID:        generateID(),
-		Content:   msg.Content,
-		AuthorID:  msg.AuthorId,
-		PostID:    msg.PostId,
-		ParentID:  msg.ParentId,
-		CreatedAt: time.Now(),
-	}
-	e.comments[msg.PostId] = append(e.comments[msg.PostId], comment)
-	e.updateMetrics(func(m *Metrics) {
-		m.TotalComments++
-	})
-	log.Printf("Comment created: %+v", comment)
-}
-
-func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	post, exists := e.posts[msg.TargetId]
-	if !exists {
-		log.Printf("Post not found for vote: %s", msg.TargetId)
-		return
-	}
-
-	if msg.IsUpvote {
-		post.Upvotes++
-	} else {
-		post.Downvotes++
-	}
-	e.updateMetrics(func(m *Metrics) {
-		m.TotalVotes++
-	})
-	log.Printf("Vote processed for post %s: Upvotes=%d, Downvotes=%d", msg.TargetId, post.Upvotes, post.Downvotes)
-}
-
 func (e *RedditEngine) handleDirectMessage(context actor.Context, msg *proto.DirectMessageMsg) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -206,6 +166,142 @@ func (e *RedditEngine) handleDirectMessage(context actor.Context, msg *proto.Dir
 	})
 	log.Printf("Direct message sent: %+v", dm)
 }
+
+func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Check if the vote target is a post
+	if post, exists := e.posts[msg.TargetId]; exists {
+		if msg.IsUpvote {
+			post.Upvotes++
+		} else {
+			post.Downvotes++
+		}
+		log.Printf("Vote applied to post: PostID=%s, Upvotes=%d, Downvotes=%d, UserID=%s",
+			post.ID, post.Upvotes, post.Downvotes, msg.UserId)
+		e.updateMetrics(func(m *Metrics) {
+			m.TotalVotes++
+		})
+		return
+	}
+
+	// Check if the vote target is a comment (very inefficient)
+	for _, comments := range e.comments {
+		for _, comment := range comments {
+			if comment.ID == msg.TargetId {
+				if msg.IsUpvote {
+					comment.Upvotes++
+				} else {
+					comment.Downvotes++
+				}
+				log.Printf("Vote applied to comment: CommentID=%s, Upvotes=%d, Downvotes=%d, UserID=%s",
+					comment.ID, comment.Upvotes, comment.Downvotes, msg.UserId)
+				e.updateMetrics(func(m *Metrics) {
+					m.TotalVotes++
+				})
+				return
+			}
+		}
+	}
+
+	log.Printf("Target not found for VoteMsg: %+v", msg)
+}
+
+// func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
+// 	e.mu.Lock()
+// 	defer e.mu.Unlock()
+
+// 	post, exists := e.posts[msg.TargetId]
+// 	if !exists {
+// 		log.Printf("Post not found for vote: %s", msg.TargetId)
+// 		return
+// 	}
+
+// 	if msg.IsUpvote {
+// 		post.Upvotes++
+// 	} else {
+// 		post.Downvotes++
+// 	}
+// 	e.updateMetrics(func(m *Metrics) {
+// 		m.TotalVotes++
+// 	})
+// 	log.Printf("Vote processed for post %s: Upvotes=%d, Downvotes=%d", msg.TargetId, post.Upvotes, post.Downvotes)
+// }
+
+func (e *RedditEngine) handleCreateComment(context actor.Context, msg *proto.CreateCommentMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Check if the post exists
+	post, postExists := e.posts[msg.PostId]
+	if !postExists {
+		log.Printf("Post not found for CreateCommentMsg: %+v", msg)
+		return
+	}
+
+	// Create a new comment
+	comment := &Comment{
+		ID:        generateID(),
+		Content:   msg.Content,
+		AuthorID:  msg.AuthorId,
+		PostID:    msg.PostId,
+		ParentID:  msg.ParentId,
+		Children:  []*Comment{},
+		CreatedAt: time.Now(),
+	}
+
+	// Add to the comments map
+	if _, exists := e.comments[comment.PostID]; !exists {
+		e.comments[comment.PostID] = []*Comment{}
+	}
+	e.comments[comment.PostID] = append(e.comments[comment.PostID], comment)
+
+	// If the comment has a parent, link it to the parent
+	if comment.ParentID != "" {
+		parentFound := false
+		// Get all the comments for the post
+		for _, c := range e.comments[comment.PostID] {
+			// Check if the parent comment exists
+			if c.ID == comment.ParentID {
+				c.Children = append(c.Children, comment)
+				parentFound = true
+				break
+			}
+		}
+		if !parentFound {
+			log.Printf("Parent comment not found for CommentID=%s, ParentID=%s", comment.ID, comment.ParentID)
+			return
+		}
+	} else {
+		// Root-level comment
+		post.Comments = append(post.Comments, comment)
+	}
+
+	log.Printf("Comment added: %+v", comment)
+	e.updateMetrics(func(m *Metrics) {
+		m.TotalComments++
+	})
+}
+
+// func (e *RedditEngine) handleCreateComment(context actor.Context, msg *proto.CreateCommentMsg) {
+// 	e.mu.Lock()
+// 	defer e.mu.Unlock()
+
+// 	comment := &Comment{
+// 		ID:        generateID(),
+// 		Content:   msg.Content,
+// 		AuthorID:  msg.AuthorId,
+// 		PostID:    msg.PostId,
+// 		ParentID:  msg.ParentId,
+// 		CreatedAt: time.Now(),
+// 	}
+// 	e.comments[msg.PostId] = append(e.comments[msg.PostId], comment)
+// 	e.updateMetrics(func(m *Metrics) {
+// 		m.TotalComments++
+// 	})
+// 	log.Printf("Comment created: %+v", comment)
+// }
 
 func generateID() string {
 	return time.Now().Format("20060102150405.000")
