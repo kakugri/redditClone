@@ -25,6 +25,5 @@ func main() {
 	}
 	log.Printf("RedditEngine started: Address=%s, Id=%s", pid.GetAddress(), pid.GetId())
 
-
 	select {}
 }

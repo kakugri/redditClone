@@ -1,3 +1,5 @@
+// internal/proto/messasges.proto
+
 syntax = "proto3";
 
 package proto;
@@ -51,4 +53,12 @@ message DirectMessageMsg {
 	string fromUser_id = 1;
 	string toUser_id = 2;
 	string content = 3;
+}
+
+message MetricsReportMsg {
+  int64 total_posts = 1;
+  int64 total_comments = 2;
+  int64 total_votes = 3;
+  int64 active_users = 4;
+  int64 total_messages = 5;
 }

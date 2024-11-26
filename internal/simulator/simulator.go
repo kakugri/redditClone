@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/kakugri/redditClone/internal/engine"
 	"github.com/kakugri/redditClone/internal/proto"
 )
 
@@ -14,7 +15,7 @@ type Simulator struct {
 	enginePID *actor.PID
 	users     []*SimulatedUser
 	numUsers  int
-	metrics   *Metrics
+	metrics   *engine.Metrics
 }
 
 type SimulatedUser struct {
@@ -23,19 +24,12 @@ type SimulatedUser struct {
 	pid       *actor.PID
 }
 
-type Metrics struct {
-	TotalPosts    int64
-	TotalComments int64
-	TotalVotes    int64
-	ActiveUsers   int64
-	StartTime     time.Time
-}
-
 type NewUserActor struct {
 	enginePID     *actor.PID
 	postFrequency time.Duration
 	userID        string
 	subredditID   string
+	simulator     *Simulator
 }
 
 func (u *NewUserActor) Receive(context actor.Context) {
@@ -49,7 +43,7 @@ func NewSimulator(enginePID *actor.PID, numUsers int) *Simulator {
 	return &Simulator{
 		enginePID: enginePID,
 		numUsers:  numUsers,
-		metrics: &Metrics{
+		metrics: &engine.Metrics{
 			StartTime: time.Now(),
 		},
 	}
@@ -66,6 +60,7 @@ func (s *Simulator) Start() {
 				postFrequency: time.Duration(rand.Intn(10)+1) * time.Second,
 				userID:        userID,
 				subredditID:   subredditID,
+				simulator:     s,
 			}
 		})
 
@@ -96,23 +91,24 @@ func (u *NewUserActor) simulateActivity(context actor.Context) {
 				AuthorId:    u.userID,
 				SubredditId: u.subredditID,
 			}
+			u.simulator.metrics.TotalPosts++
 			context.Send(u.enginePID, msg)
 			log.Printf("User %s sent a post to subreddit %s", u.userID, u.subredditID)
 		case 1:
-			// Create comment
+			// Simulate registering a user
 			msg := &proto.RegisterUserMsg{
 				Username: u.userID,
 			}
+			u.simulator.metrics.ActiveUsers++
 			context.Send(u.enginePID, msg)
-			log.Printf("User %s created", u.userID)
+			log.Printf("User %s registered", u.userID)
 		case 2:
-			// Create comment
+			// Simulate creating a subreddit
 			msg := &proto.CreateSubredditMsg{
 				Name:        u.subredditID,
 				Description: "Simulated Subreddit",
 				CreatorId:   u.userID,
 			}
-			// log.Printf("Sending CreateCommentMsg: %+v", msg)
 			context.Send(u.enginePID, msg)
 			log.Printf("User %s created subreddit %s", u.userID, u.subredditID)
 		}
@@ -121,7 +117,7 @@ func (u *NewUserActor) simulateActivity(context actor.Context) {
 	}
 }
 
-func (s *Simulator) GetMetrics() *Metrics {
+func (s *Simulator) GetMetrics() *engine.Metrics {
 	return s.metrics
 }
 

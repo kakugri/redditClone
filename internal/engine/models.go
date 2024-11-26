@@ -2,6 +2,7 @@
 package engine
 
 import (
+	"sync"
 	"time"
 )
 
@@ -38,7 +39,7 @@ type Comment struct {
 	Content   string
 	AuthorID  string
 	PostID    string
-	ParentID  string // For hierarchical comments
+	ParentID  string
 	Children  []*Comment
 	Upvotes   int
 	Downvotes int
@@ -51,4 +52,14 @@ type DirectMessage struct {
 	ToUserID   string
 	Content    string
 	CreatedAt  time.Time
+}
+
+type Metrics struct {
+	mu            sync.Mutex
+	TotalPosts    int64
+	TotalComments int64
+	TotalVotes    int64
+	ActiveUsers   int64
+	TotalMessages int64
+	StartTime     time.Time
 }

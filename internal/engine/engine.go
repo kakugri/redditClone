@@ -17,6 +17,7 @@ type RedditEngine struct {
 	posts      map[string]*Post
 	messages   map[string][]*DirectMessage
 	comments   map[string][]*Comment
+	metrics    *Metrics
 	mu         sync.RWMutex
 }
 
@@ -27,18 +28,23 @@ func NewRedditEngine() *RedditEngine {
 		posts:      make(map[string]*Post),
 		messages:   make(map[string][]*DirectMessage),
 		comments:   make(map[string][]*Comment),
+		metrics: &Metrics{
+			StartTime: time.Now(),
+		},
 	}
 }
 
 func (e *RedditEngine) Receive(context actor.Context) {
 	message := context.Message()
-
-	// Log the type and content of the message
 	log.Printf("Engine received message of type: %T, content: %+v", message, message)
 
 	switch msg := message.(type) {
 	case *actor.Started:
 		log.Println("RedditEngine started and ready to receive messages.")
+		e.StartMetricsReporter(context)
+	case *proto.MetricsReportMsg:
+		log.Printf("Metrics Report: TotalPosts=%d, ActiveUsers=%d, TotalVotes=%d, TotalComments=%d, TotalMessages=%d", e.metrics.TotalPosts, e.metrics.ActiveUsers,
+			e.metrics.TotalVotes, e.metrics.TotalComments, e.metrics.TotalMessages)
 	case *proto.RegisterUserMsg:
 		log.Printf("Received RegisterUserMsg: %+v", msg)
 		e.handleRegisterUser(context, msg)
@@ -48,15 +54,49 @@ func (e *RedditEngine) Receive(context actor.Context) {
 	case *proto.CreatePostMsg:
 		log.Printf("Received CreatePostMsg: %+v", msg)
 		e.handleCreatePost(context, msg)
+	case *proto.CreateCommentMsg:
+		log.Printf("Received CreateCommentMsg: %+v", msg)
+		e.handleCreateComment(context, msg)
+	case *proto.VoteMsg:
+		log.Printf("Received VoteMsg: %+v", msg)
+		e.handleVote(context, msg)
+	case *proto.DirectMessageMsg:
+		log.Printf("Received DirectMessageMsg: %+v", msg)
+		e.handleDirectMessage(context, msg)
 	default:
 		log.Printf("Unhandled message type: %+v", msg)
-		// case *VoteMsg:
-		// 	e.handleVote(context, msg)
-		// case *CreateCommentMsg:
-		// 	e.handleCreateComment(context, msg)
-		// case *DirectMessageMsg:
-		// 	e.handleDirectMessage(context, msg)
 	}
+}
+
+func (e *RedditEngine) StartMetricsReporter(context actor.Context) {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			e.ReportMetrics(context)
+		}
+	}()
+}
+
+func (e *RedditEngine) ReportMetrics(context actor.Context) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	metricsCopy := *e.metrics // Create a copy to avoid race conditions
+	context.Send(context.Self(), &proto.MetricsReportMsg{
+		TotalPosts:    metricsCopy.TotalPosts,
+		TotalComments: metricsCopy.TotalComments,
+		TotalVotes:    metricsCopy.TotalVotes,
+		ActiveUsers:   metricsCopy.ActiveUsers,
+		TotalMessages: metricsCopy.TotalMessages,
+	})
+}
+
+func (e *RedditEngine) updateMetrics(metricFunc func(*Metrics)) {
+	e.metrics.mu.Lock()
+	defer e.metrics.mu.Unlock()
+	metricFunc(e.metrics)
 }
 
 func (e *RedditEngine) handleRegisterUser(context actor.Context, msg *proto.RegisterUserMsg) {
@@ -69,18 +109,15 @@ func (e *RedditEngine) handleRegisterUser(context actor.Context, msg *proto.Regi
 		JoinDate: time.Now(),
 	}
 	e.users[user.ID] = user
+	e.updateMetrics(func(m *Metrics) {
+		m.ActiveUsers++
+	})
 	log.Printf("User registered: %+v", user)
-	// context.Respond(user)
 }
 
 func (e *RedditEngine) handleCreatePost(context actor.Context, msg *proto.CreatePostMsg) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-
-	if msg.AuthorId == "" || msg.SubredditId == "" {
-		log.Printf("CreatePostMsg missing AuthorID or SubredditID: %+v", msg)
-		return
-	}
 
 	post := &Post{
 		ID:          generateID(),
@@ -91,8 +128,10 @@ func (e *RedditEngine) handleCreatePost(context actor.Context, msg *proto.Create
 		CreatedAt:   time.Now(),
 	}
 	e.posts[post.ID] = post
+	e.updateMetrics(func(m *Metrics) {
+		m.TotalPosts++
+	})
 	log.Printf("Post created: %+v", post)
-	// context.Respond(post)
 }
 
 func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *proto.CreateSubredditMsg) {
@@ -108,10 +147,65 @@ func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *proto.C
 	}
 	e.subreddits[subreddit.ID] = subreddit
 	log.Printf("Subreddit created: %+v", subreddit)
-	// context.Respond(subreddit)
 }
 
-// Add other handler methods...
+func (e *RedditEngine) handleCreateComment(context actor.Context, msg *proto.CreateCommentMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	comment := &Comment{
+		ID:        generateID(),
+		Content:   msg.Content,
+		AuthorID:  msg.AuthorId,
+		PostID:    msg.PostId,
+		ParentID:  msg.ParentId,
+		CreatedAt: time.Now(),
+	}
+	e.comments[msg.PostId] = append(e.comments[msg.PostId], comment)
+	e.updateMetrics(func(m *Metrics) {
+		m.TotalComments++
+	})
+	log.Printf("Comment created: %+v", comment)
+}
+
+func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	post, exists := e.posts[msg.TargetId]
+	if !exists {
+		log.Printf("Post not found for vote: %s", msg.TargetId)
+		return
+	}
+
+	if msg.IsUpvote {
+		post.Upvotes++
+	} else {
+		post.Downvotes++
+	}
+	e.updateMetrics(func(m *Metrics) {
+		m.TotalVotes++
+	})
+	log.Printf("Vote processed for post %s: Upvotes=%d, Downvotes=%d", msg.TargetId, post.Upvotes, post.Downvotes)
+}
+
+func (e *RedditEngine) handleDirectMessage(context actor.Context, msg *proto.DirectMessageMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	dm := &DirectMessage{
+		ID:         generateID(),
+		FromUserID: msg.FromUserId,
+		ToUserID:   msg.ToUserId,
+		Content:    msg.Content,
+		CreatedAt:  time.Now(),
+	}
+	e.messages[msg.ToUserId] = append(e.messages[msg.ToUserId], dm)
+	e.updateMetrics(func(m *Metrics) {
+		m.TotalMessages++
+	})
+	log.Printf("Direct message sent: %+v", dm)
+}
 
 func generateID() string {
 	return time.Now().Format("20060102150405.000")

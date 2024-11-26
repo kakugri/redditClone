@@ -48,7 +48,7 @@ func main() {
 	time.Sleep(20 * time.Second)
 
 	// Start the simulator with 5 simulated users
-	sim := simulator.NewSimulator(enginePID, 3)
+	sim := simulator.NewSimulator(enginePID, 5)
 	sim.Start()
 	log.Println("Simulator started.")
 
@@ -57,7 +57,8 @@ func main() {
 		ticker := time.NewTicker(1 * time.Minute)
 		for range ticker.C {
 			metrics := sim.GetMetrics()
-			log.Printf("Metrics: %+v", metrics)
+			log.Printf("Metrics Report: TotalPosts=%d, ActiveUsers=%d, TotalVotes=%d, TotalComments=%d, TotalMessages=%d", metrics.TotalPosts, metrics.ActiveUsers,
+				metrics.TotalVotes, metrics.TotalComments, metrics.TotalMessages)
 		}
 	}()
 
