@@ -48,10 +48,11 @@ func (e *RedditEngine) Receive(context actor.Context) {
 	case *proto.CreatePostMsg:
 		log.Printf("Received CreatePostMsg: %+v", msg)
 		e.handleCreatePost(context, msg)
+	case *proto.VoteMsg:
+		log.Printf("Received VoteMsg: %+v", msg)
+		e.handleVote(context, msg)
 	default:
 		log.Printf("Unhandled message type: %+v", msg)
-		// case *VoteMsg:
-		// 	e.handleVote(context, msg)
 		// case *CreateCommentMsg:
 		// 	e.handleCreateComment(context, msg)
 		// case *DirectMessageMsg:
@@ -112,6 +113,49 @@ func (e *RedditEngine) handleCreateSubreddit(context actor.Context, msg *proto.C
 }
 
 // Add other handler methods...
+
+func (e *RedditEngine) handleVote(context actor.Context, msg *proto.VoteMsg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Check if the vote target is a post
+	if post, exists := e.posts[msg.TargetId]; exists {
+		applyVoteToPost(post, msg.IsUpvote)
+		log.Printf("Vote applied to post: PostID=%s, Upvotes=%d, Downvotes=%d, UserID=%s",
+			post.ID, post.Upvotes, post.Downvotes, msg.UserId)
+		return
+	}
+
+	// Check if the vote target is a comment (very inefficient)
+	for _, comments := range e.comments {
+		for _, comment := range comments {
+			if comment.ID == msg.TargetId {
+				applyVoteToComment(comment, msg.IsUpvote)
+				log.Printf("Vote applied to comment: CommentID=%s, Upvotes=%d, Downvotes=%d, UserID=%s",
+					comment.ID, comment.Upvotes, comment.Downvotes, msg.UserId)
+				return
+			}
+		}
+	}
+
+	log.Printf("Target not found for VoteMsg: %+v", msg)
+}
+
+func applyVoteToPost(post *Post, isUpvote bool) {
+	if isUpvote {
+		post.Upvotes++
+	} else {
+		post.Downvotes++
+	}
+}
+
+func applyVoteToComment(comment *Comment, isUpvote bool) {
+	if isUpvote {
+		comment.Upvotes++
+	} else {
+		comment.Downvotes++
+	}
+}
 
 func generateID() string {
 	return time.Now().Format("20060102150405.000")
