@@ -82,7 +82,7 @@ func (u *NewUserActor) simulateActivity(context actor.Context) {
 		}
 
 		// Simulate various actions
-		switch rand.Intn(3) {
+		switch rand.Intn(5) {
 		case 0:
 			// Simulate creating a post
 			msg := &proto.CreatePostMsg{
@@ -111,6 +111,36 @@ func (u *NewUserActor) simulateActivity(context actor.Context) {
 			}
 			context.Send(u.enginePID, msg)
 			log.Printf("User %s created subreddit %s", u.userID, u.subredditID)
+		case 3:
+			// Simulate creating a post
+			msg := &proto.CreateCommentMsg{
+				PostId:   "Simulated Post Title",
+				Content:  "Simulated Comment Content",
+				AuthorId: u.userID,
+				ParentId: "Simulated ParentId",
+			}
+			u.simulator.metrics.TotalComments++
+			context.Send(u.enginePID, msg)
+			log.Printf("User %s created a comment under %s", u.userID, msg.ParentId)
+		case 4:
+			// Simulate creating a post
+			msg := &proto.DirectMessageMsg{
+				ToUserId:   "Simulated Recipient ID",
+				Content:    "Simulated Comment Content",
+				FromUserId: "Simulated Recipient ID",
+			}
+			u.simulator.metrics.TotalMessages++
+			context.Send(u.enginePID, msg)
+			log.Printf("User %s sent a message to %s", msg.ToUserId, msg.FromUserId)
+		case 5:
+			// Simulate creating a post
+			// msg := &proto.JoinSubredditMsg{
+			// 	UserId:      "Simulated Recipient ID",
+			// 	SubredditId: "Simulated Subreddit ID",
+			// }
+			// u.simulator.metrics.TotalComments++
+			// context.Send(u.enginePID, msg)
+			// log.Printf("User %s joined subreddit %s", msg.UserId, msg.SubredditId)
 		}
 
 		time.Sleep(u.postFrequency)

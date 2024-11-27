@@ -3,12 +3,14 @@ package main
 
 import (
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 	"github.com/kakugri/redditClone/internal/proto"
 	"github.com/kakugri/redditClone/internal/simulator"
+	"github.com/shirou/gopsutil/v3/cpu"
 )
 
 func main() {
@@ -48,7 +50,7 @@ func main() {
 	time.Sleep(20 * time.Second)
 
 	// Start the simulator with 5 simulated users
-	sim := simulator.NewSimulator(enginePID, 5)
+	sim := simulator.NewSimulator(enginePID, 2100)
 	sim.Start()
 	log.Println("Simulator started.")
 
@@ -57,8 +59,15 @@ func main() {
 		ticker := time.NewTicker(1 * time.Minute)
 		for range ticker.C {
 			metrics := sim.GetMetrics()
-			log.Printf("Metrics Report: TotalPosts=%d, ActiveUsers=%d, TotalVotes=%d, TotalComments=%d, TotalMessages=%d", metrics.TotalPosts, metrics.ActiveUsers,
-				metrics.TotalVotes, metrics.TotalComments, metrics.TotalMessages)
+			// Capture memory usage
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+
+			// Capture CPU usage
+			cpuPercent, _ := cpu.Percent(0, false)
+			log.Printf("Metrics Report: TotalPosts=%d, ActiveUsers=%d, TotalVotes=%d, TotalComments=%d, TotalMessages=%d, Memory=%.2f MB, CPU=%.2f%%", metrics.TotalPosts, metrics.ActiveUsers,
+				metrics.TotalVotes, metrics.TotalComments, metrics.TotalMessages, float64(m.Alloc)/1024/1024,
+				cpuPercent[0])
 		}
 	}()
 
