@@ -14,9 +14,20 @@ cd redditClone
 ```sh
 go run cmd/engine/redditEngine.go
 ```
+Skip to 4 if running testing the REST API
+
 3) Run Simulator in separate terminal connects to the engine and generates activity. Metrics are logged every minute.:
 ```sh
 go run cmd/simulator/redditSimulator.go
+```
+Only run the next few steps if testing the REST API
+4) Run API in separate terminal connects to the engine and generates activity. Metrics are logged every minute.:
+```sh
+go run cmd/api2/api2.go 
+```
+5) Run client simulator in separate terminal connects to the engine and generates activity. Metrics are logged every minute.:
+```sh
+go run cmd/clients/clients.go 
 ```
 Features:
 ## Engine
