@@ -4,6 +4,10 @@
 * Siddhant Kalgutkar
 ## Overview
 This project implements a Reddit-like engine and a simulator to test its performance and scalability. The engine supports user registration, subreddit management, posting, commenting, and voting. The simulator mimics user interactions to generate meaningful metrics.
+
+### Video Link
+> https://www.youtube.com/watch?v=touC6qHoHCU&ab_channel=KingdomMutalaAkugri
+
 ### Instructions to Run:
 1) Clone the repo and open:
 ```sh
@@ -26,6 +30,7 @@ Only run the next few steps if testing the REST API
 ```sh
 go run cmd/api2/api2.go 
 ```
+
 5) Run client simulator in separate terminal connects to the engine and generates activity. Metrics are logged every minute.:
 ```sh
 go run cmd/clients/clients.go 
