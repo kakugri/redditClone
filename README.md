@@ -21,6 +21,7 @@ Skip to 4 if running testing the REST API
 go run cmd/simulator/redditSimulator.go
 ```
 Only run the next few steps if testing the REST API
+
 4) Run API in separate terminal connects to the engine and generates activity. Metrics are logged every minute.:
 ```sh
 go run cmd/api2/api2.go 
