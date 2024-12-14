@@ -1,4 +1,4 @@
-// cmd/engine/main.go
+// cmd/engine/redditEngine.go
 package main
 
 import (

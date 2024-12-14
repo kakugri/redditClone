@@ -1,3 +1,4 @@
+// cmd/clients/clients.go
 package main
 
 import (
